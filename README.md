@@ -102,7 +102,7 @@ The project requires the following data files, which should be placed in the `da
 
 ## Project Overview
 
-This project solves the Personal Shopper's Dilemma (PSD) problem, which involves:
+This project solves the Personal Shopper problem, which involves:
 - Purchasing a set of products from multiple stores
 - Different pricing of products at different stores
 - Different store locations, affecting travel time
