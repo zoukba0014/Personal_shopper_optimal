@@ -4,6 +4,7 @@ use personal_shopper::algorithms::bsl_psd::BSLPSD;
 use personal_shopper::models::{Location, ShoppingList};
 use personal_shopper::utils::init_map::init_map_with_road_network;
 use plotters::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Instant;
@@ -12,7 +13,7 @@ use std::time::Instant;
 fn test_extreme_threshold_analysis() -> Result<(), Box<dyn Error>> {
     // Configuration parameters
     let city_code = "AMS"; // City code
-    let total_product_supply = 5; // Product supply
+    let total_product_supply = 30; // Product supply
     let output_path = "extreme_threshold_analysis.png"; // Main output image path
     let time_analysis_output_path = "extreme_threshold_time_analysis.png"; // Time analysis output path
 
@@ -60,11 +61,19 @@ fn test_extreme_threshold_analysis() -> Result<(), Box<dyn Error>> {
     product_ids.sort();
 
     if product_ids.len() >= 5 {
-        shopping_list.add_item(product_ids[0], 2);
-        shopping_list.add_item(product_ids[1], 4);
-        shopping_list.add_item(product_ids[2], 4);
-        shopping_list.add_item(product_ids[3], 3);
-        shopping_list.add_item(product_ids[4], 4);
+        let mut rng = rand::thread_rng();
+
+        let quantity1 = rng.gen_range(2..=5);
+        let quantity2 = rng.gen_range(2..=5);
+        let quantity3 = rng.gen_range(2..=5);
+        let quantity4 = rng.gen_range(2..=5);
+        let quantity5 = rng.gen_range(2..=5);
+
+        shopping_list.add_item(product_ids[0], quantity1);
+        shopping_list.add_item(product_ids[1], quantity2);
+        shopping_list.add_item(product_ids[2], quantity3);
+        shopping_list.add_item(product_ids[3], quantity4);
+        shopping_list.add_item(product_ids[4], quantity5);
     }
 
     println!("\nShopping List:");
@@ -80,15 +89,15 @@ fn test_extreme_threshold_analysis() -> Result<(), Box<dyn Error>> {
     bsl_psd.precompute_data();
 
     // Define start and end points (shopper and customer locations)
-    let shopper_location = Location::new(-80.0, -80.0);
-    let customer_location = Location::new(80.0, 80.0);
+    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
+    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
 
     println!(
-        "Shopper location: ({:.1}, {:.1})",
+        "Shopper location: ({:.4}, {:.4})",
         shopper_location.x, shopper_location.y
     );
     println!(
-        "Customer location: ({:.1}, {:.1})",
+        "Customer location: ({:.4}, {:.4})",
         customer_location.x, customer_location.y
     );
 

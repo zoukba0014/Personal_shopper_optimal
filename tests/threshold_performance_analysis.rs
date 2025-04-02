@@ -4,6 +4,7 @@ use personal_shopper::algorithms::bsl_psd::BSLPSD;
 use personal_shopper::models::{Location, ShoppingList};
 use personal_shopper::utils::init_map::init_map_with_road_network;
 use plotters::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::Instant;
@@ -12,7 +13,7 @@ use std::time::Instant;
 fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
     // Configuration parameters
     let city_code = "AMS"; // City code
-    let total_product_supply = 5; // Product supply
+    let total_product_supply = 30; // Product supply
     let output_path = "threshold_performance_analysis.png"; // Main output image path
     let time_analysis_output_path = "threshold_time_analysis.png"; // Time analysis output path
 
@@ -59,11 +60,19 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
     product_ids.sort();
 
     if product_ids.len() >= 5 {
-        shopping_list.add_item(product_ids[0], 2);
-        shopping_list.add_item(product_ids[1], 4);
-        shopping_list.add_item(product_ids[2], 4);
-        shopping_list.add_item(product_ids[3], 3);
-        shopping_list.add_item(product_ids[4], 4);
+        let mut rng = rand::thread_rng();
+
+        let quantity1 = rng.gen_range(2..=5);
+        let quantity2 = rng.gen_range(2..=5);
+        let quantity3 = rng.gen_range(2..=5);
+        let quantity4 = rng.gen_range(2..=5);
+        let quantity5 = rng.gen_range(2..=5);
+
+        shopping_list.add_item(product_ids[0], quantity1);
+        shopping_list.add_item(product_ids[1], quantity2);
+        shopping_list.add_item(product_ids[2], quantity3);
+        shopping_list.add_item(product_ids[3], quantity4);
+        shopping_list.add_item(product_ids[4], quantity5);
     }
 
     println!("\nShopping List:");
@@ -79,15 +88,15 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
     bsl_psd.precompute_data();
 
     // Define start and end points (shopper and customer locations)
-    let shopper_location = Location::new(-80.0, -80.0);
-    let customer_location = Location::new(80.0, 80.0);
+    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
+    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
 
     println!(
-        "Shopper location: ({:.1}, {:.1})",
+        "Shopper location: ({:.4}, {:.4})",
         shopper_location.x, shopper_location.y
     );
     println!(
-        "Customer location: ({:.1}, {:.1})",
+        "Customer location: ({:.4}, {:.4})",
         customer_location.x, customer_location.y
     );
 
@@ -122,6 +131,54 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
                 search_time.as_secs_f64(),
                 total_time.as_secs_f64(),
             ));
+
+            // Add route quality trade-off analysis
+            println!(
+                "\nRoute Quality Trade-off Analysis for threshold {}:",
+                threshold
+            );
+            if routes.len() >= 2 {
+                let fastest = &routes.first().unwrap();
+                let cheapest = &routes.last().unwrap();
+
+                println!(
+                    "  Fastest route: {:.2} minutes, ${:.2}, {} stores",
+                    fastest.shopping_time,
+                    fastest.shopping_cost,
+                    fastest.stores.len()
+                );
+                println!(
+                    "  Cheapest route: {:.2} minutes, ${:.2}, {} stores",
+                    cheapest.shopping_time,
+                    cheapest.shopping_cost,
+                    cheapest.stores.len()
+                );
+
+                // Calculate and display trade-off percentages
+                let time_diff_percent = 100.0 * (cheapest.shopping_time - fastest.shopping_time)
+                    / cheapest.shopping_time;
+                let cost_diff_percent = 100.0 * (fastest.shopping_cost - cheapest.shopping_cost)
+                    / cheapest.shopping_cost;
+
+                println!("  Trade-off: Fastest route is {:.1}% faster but {:.1}% more expensive than the cheapest route.",
+                         time_diff_percent, cost_diff_percent);
+
+                // Calculate trade-off efficiency (time saved per extra dollar spent)
+                let time_saved = cheapest.shopping_time - fastest.shopping_time;
+                let extra_cost = fastest.shopping_cost - cheapest.shopping_cost;
+                let efficiency = if extra_cost > 0.0 {
+                    time_saved / extra_cost
+                } else {
+                    0.0
+                };
+
+                println!(
+                    "  Trade-off Efficiency: {:.2} minutes saved per extra dollar spent",
+                    efficiency
+                );
+            } else {
+                println!("  Only one route found, no trade-off analysis possible.");
+            }
         }
     }
 
@@ -140,6 +197,69 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
         "Time analysis visualization saved to: {}",
         time_analysis_output_path
     );
+
+    // Create trade-off analysis visualization
+    if !results.is_empty() {
+        // Collect trade-off data for each threshold
+        let mut trade_off_results = Vec::new();
+
+        // Use the stored results rather than re-running the algorithm
+        for &threshold in &thresholds {
+            let trade_off_data = thresholds.iter().enumerate().find_map(|(i, &t)| {
+                if t == threshold && i < results.len() {
+                    // Find the solution for this threshold from existing test output
+                    println!("\nRetrieving trade-off data for threshold {}", threshold);
+
+                    // Re-solve one more time just to get route details (we really only do this once per threshold)
+                    let (routes, _) = bsl_psd.solve_with_parallel(
+                        &shopping_list,
+                        shopper_location,
+                        customer_location,
+                        threshold,
+                    );
+
+                    // Now analyze the routes
+                    if routes.len() >= 2 {
+                        let fastest = &routes.first().unwrap();
+                        let cheapest = &routes.last().unwrap();
+
+                        // Calculate trade-off percentages
+                        let time_diff_percent = 100.0
+                            * (cheapest.shopping_time - fastest.shopping_time)
+                            / cheapest.shopping_time;
+                        let cost_diff_percent = 100.0
+                            * (fastest.shopping_cost - cheapest.shopping_cost)
+                            / cheapest.shopping_cost;
+
+                        // Calculate efficiency
+                        let time_saved = cheapest.shopping_time - fastest.shopping_time;
+                        let extra_cost = fastest.shopping_cost - cheapest.shopping_cost;
+                        let efficiency = if extra_cost > 0.0 {
+                            time_saved / extra_cost
+                        } else {
+                            0.0
+                        };
+
+                        return Some((threshold, efficiency, time_diff_percent, cost_diff_percent));
+                    }
+                }
+                None
+            });
+
+            if let Some(data) = trade_off_data {
+                trade_off_results.push(data);
+            }
+        }
+
+        if !trade_off_results.is_empty() {
+            let trade_off_output_path = "threshold_trade_off_analysis.png";
+            visualize_trade_off_efficiency(&trade_off_results, trade_off_output_path)?;
+            println!(
+                "Trade-off efficiency visualization saved to: {}",
+                trade_off_output_path
+            );
+        }
+    }
 
     Ok(())
 }
@@ -300,6 +420,142 @@ fn visualize_time_analysis(
 
     // Add legend
     chart
+        .configure_series_labels()
+        .background_style(&WHITE.mix(0.8))
+        .border_style(&BLACK)
+        .position(SeriesLabelPosition::UpperRight)
+        .draw()?;
+
+    root.present()?;
+    Ok(())
+}
+
+/// Visualize the trade-off efficiency for each threshold
+fn visualize_trade_off_efficiency(
+    results: &[(i32, f64, f64, f64)],
+    output_path: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Create root area
+    let root = BitMapBackend::new(output_path, (1000, 700)).into_drawing_area();
+    root.fill(&WHITE)?;
+
+    // Split into two chart areas - top for efficiency, bottom for percentages
+    let areas = root.split_vertically(350);
+
+    // Find min/max values for axis scaling
+    let min_threshold = results.iter().map(|&(t, _, _, _)| t).min().unwrap_or(0);
+    let max_threshold = results.iter().map(|&(t, _, _, _)| t).max().unwrap_or(0);
+    let threshold_padding = (max_threshold - min_threshold) as f64 * 0.1;
+
+    // Calculate max values for other metrics
+    let max_efficiency = results
+        .iter()
+        .map(|&(_, e, _, _)| e)
+        .fold(0.0, |a, b| f64::max(a, b));
+    let max_percent = results
+        .iter()
+        .map(|&(_, _, time_diff, cost_diff)| f64::max(time_diff, cost_diff))
+        .fold(0.0, |a, b| f64::max(a, b));
+
+    // 1. Draw efficiency chart
+    let mut efficiency_chart = ChartBuilder::on(&areas.0)
+        .caption(
+            "Trade-off Efficiency by Threshold",
+            ("sans-serif", 22).into_font(),
+        )
+        .margin(10)
+        .x_label_area_size(30)
+        .y_label_area_size(40)
+        .build_cartesian_2d(
+            (min_threshold as f64 - threshold_padding)..(max_threshold as f64 + threshold_padding),
+            0.0..(max_efficiency * 1.1),
+        )?;
+
+    efficiency_chart
+        .configure_mesh()
+        .x_desc("Threshold Value")
+        .y_desc("Efficiency (minutes saved per dollar)")
+        .draw()?;
+
+    // Draw efficiency line
+    efficiency_chart.draw_series(LineSeries::new(
+        results.iter().map(|&(t, e, _, _)| (t as f64, e)),
+        BLUE.mix(0.8).stroke_width(3),
+    ))?;
+
+    efficiency_chart.draw_series(
+        results
+            .iter()
+            .map(|&(t, e, _, _)| Circle::new((t as f64, e), 5, RED.filled())),
+    )?;
+
+    // Add efficiency labels
+    for &(threshold, efficiency, _, _) in results {
+        efficiency_chart.draw_series(std::iter::once(Text::new(
+            format!("{:.2}", efficiency),
+            (threshold as f64, efficiency + (max_efficiency * 0.05)),
+            ("sans-serif", 15).into_font(),
+        )))?;
+    }
+
+    // 2. Draw percentage chart
+    let mut percent_chart = ChartBuilder::on(&areas.1)
+        .caption(
+            "Trade-off Time/Cost Percentage Differences by Threshold",
+            ("sans-serif", 22).into_font(),
+        )
+        .margin(10)
+        .x_label_area_size(30)
+        .y_label_area_size(40)
+        .build_cartesian_2d(
+            (min_threshold as f64 - threshold_padding)..(max_threshold as f64 + threshold_padding),
+            0.0..(max_percent * 1.1),
+        )?;
+
+    percent_chart
+        .configure_mesh()
+        .x_desc("Threshold Value")
+        .y_desc("Percentage Difference (%)")
+        .draw()?;
+
+    // Draw time difference percentage line
+    percent_chart
+        .draw_series(LineSeries::new(
+            results
+                .iter()
+                .map(|&(t, _, time_diff, _)| (t as f64, time_diff)),
+            GREEN.mix(0.8).stroke_width(3),
+        ))?
+        .label("Time Savings %")
+        .legend(|(x, y)| {
+            PathElement::new(vec![(x, y), (x + 20, y)], GREEN.mix(0.8).stroke_width(3))
+        });
+
+    // Draw cost difference percentage line
+    percent_chart
+        .draw_series(LineSeries::new(
+            results
+                .iter()
+                .map(|&(t, _, _, cost_diff)| (t as f64, cost_diff)),
+            RED.mix(0.8).stroke_width(3),
+        ))?
+        .label("Cost Increase %")
+        .legend(|(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], RED.mix(0.8).stroke_width(3)));
+
+    percent_chart.draw_series(
+        results
+            .iter()
+            .map(|&(t, _, time_diff, _)| Circle::new((t as f64, time_diff), 5, GREEN.filled())),
+    )?;
+
+    percent_chart.draw_series(
+        results
+            .iter()
+            .map(|&(t, _, _, cost_diff)| Circle::new((t as f64, cost_diff), 5, RED.filled())),
+    )?;
+
+    // Add legend
+    percent_chart
         .configure_series_labels()
         .background_style(&WHITE.mix(0.8))
         .border_style(&BLACK)

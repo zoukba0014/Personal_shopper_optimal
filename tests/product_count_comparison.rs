@@ -3,6 +3,7 @@ use personal_shopper::algorithms::bsl_psd::BSLPSD;
 use personal_shopper::models::{Location, ShoppingList, ShoppingRoute};
 use personal_shopper::utils::init_map::init_map_with_road_network;
 use plotters::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -27,10 +28,11 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
     let mut all_best_times = Vec::new();
     let mut all_total_times = Vec::new();
     let mut all_route_counts = Vec::new();
+    let total_product_counts = 30u32;
 
     // Define fixed locations for shopper and customer (to ensure consistency)
-    let shopper_location = Location::new(0.0, 0.0);
-    let customer_location = Location::new(10.0, 10.0);
+    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
+    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
 
     // Run tests for each product count
     for &product_count in &product_counts {
@@ -39,7 +41,7 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
         // Initialize map data for limited supply scenario
         println!("Loading map data for {} products...", product_count);
         let (stores, travel_times) =
-            match init_map_with_road_network(city_code, false, product_count) {
+            match init_map_with_road_network(city_code, false, total_product_counts) {
                 Ok(data) => data,
                 Err(e) => {
                     eprintln!("Error loading map data: {}", e);
@@ -83,8 +85,9 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
         println!("\nShopping List (using {} products):", count_to_use);
         for i in 0..count_to_use {
             if i < product_ids.len() {
+                let mut rng = rand::thread_rng();
+                let quantity = rng.gen_range(2..=5);
                 let product_id = product_ids[i];
-                let quantity = (i % 3) as u32 + 3; // 3-5 units per product
                 shopping_list.add_item(product_id, quantity);
 
                 let product_info = available_products.get(&product_id);
@@ -99,11 +102,11 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
         bsl_psd.precompute_data();
 
         println!(
-            "Shopper starting location ({:.1}, {:.1})",
+            "Shopper starting location ({:.4}, {:.4})",
             shopper_location.x, shopper_location.y
         );
         println!(
-            "Customer delivery location ({:.1}, {:.1})",
+            "Customer delivery location ({:.4}, {:.4})",
             customer_location.x, customer_location.y
         );
 

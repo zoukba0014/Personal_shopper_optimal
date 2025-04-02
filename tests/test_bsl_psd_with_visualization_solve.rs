@@ -3,6 +3,7 @@ use personal_shopper::algorithms::bsl_psd::BSLPSD;
 use personal_shopper::models::{Location, ShoppingList, ShoppingRoute, StoreId};
 use personal_shopper::utils::init_map::init_map_with_road_network;
 use plotters::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -10,7 +11,7 @@ use std::error::Error;
 fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
     // Configuration parameters
     let city_code = "AMS"; // City code
-    let total_product_supply = 5; // Product supply
+    let total_product_supply = 30; // Product supply
     let parallel_output_path = "bsl_psd_routes_parallel.png"; // Output image path for parallel
     let debug_output_path = "bsl_psd_routes_debug.png"; // Output image path for debug
     let threshold = 10000;
@@ -56,11 +57,19 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
     product_ids.sort();
 
     if product_ids.len() >= 5 {
-        shopping_list.add_item(product_ids[0], 2);
-        shopping_list.add_item(product_ids[1], 4);
-        shopping_list.add_item(product_ids[2], 4);
-        shopping_list.add_item(product_ids[3], 3);
-        shopping_list.add_item(product_ids[4], 4);
+        let mut rng = rand::thread_rng();
+
+        let quantity1 = rng.gen_range(2..=5);
+        let quantity2 = rng.gen_range(2..=5);
+        let quantity3 = rng.gen_range(2..=5);
+        let quantity4 = rng.gen_range(2..=5);
+        let quantity5 = rng.gen_range(2..=5);
+
+        shopping_list.add_item(product_ids[0], quantity1);
+        shopping_list.add_item(product_ids[1], quantity2);
+        shopping_list.add_item(product_ids[2], quantity3);
+        shopping_list.add_item(product_ids[3], quantity4);
+        shopping_list.add_item(product_ids[4], quantity5);
     }
 
     println!("\nShopping List:");
@@ -76,15 +85,15 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
     bsl_psd.precompute_data();
 
     // Define start and end points (also make them more spread out)
-    let shopper_location = Location::new(-80.0, -80.0);
-    let customer_location = Location::new(80.0, 80.0);
+    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
+    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
 
     println!(
-        "Shopper starting location ({:.1}, {:.1})",
+        "Shopper starting location ({:.4}, {:.4})",
         shopper_location.x, shopper_location.y
     );
     println!(
-        "Customer delivery location ({:.1}, {:.1})",
+        "Customer delivery location ({:.4}, {:.4})",
         customer_location.x, customer_location.y
     );
 
@@ -109,7 +118,7 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
         println!("No feasible routes found with parallel solver!");
     } else {
         // Randomize store locations for the parallel results
-        let parallel_store_locations = generate_store_locations(&parallel_results);
+        // let parallel_store_locations = generate_store_locations(&parallel_results);
 
         // Print each route's information for parallel
         for (i, route) in parallel_results.iter().enumerate() {
@@ -119,14 +128,14 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
         }
 
         // Visualize all routes from parallel solver
-        visualize_all_routes(
-            parallel_output_path,
-            &parallel_results,
-            &parallel_store_locations,
-            &shopper_location,
-            &customer_location,
-            "BSL-PSD Shopping Routes (Parallel Solver)",
-        )?;
+        // visualize_all_routes(
+        //     parallel_output_path,
+        //     &parallel_results,
+        //     &parallel_store_locations,
+        //     &shopper_location,
+        //     &customer_location,
+        //     "BSL-PSD Shopping Routes (Parallel Solver)",
+        // )?;
 
         println!(
             "Parallel visualization complete. Output saved to: {}",
@@ -155,7 +164,7 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
         println!("No feasible routes found with debug solver!");
     } else {
         // Randomize store locations for the debug results
-        let debug_store_locations = generate_store_locations(&debug_results);
+        // let debug_store_locations = generate_store_locations(&debug_results);
 
         // Print each route's information for debug
         for (i, route) in debug_results.iter().enumerate() {
@@ -165,14 +174,14 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
         }
 
         // Visualize all routes from debug solver
-        visualize_all_routes(
-            debug_output_path,
-            &debug_results,
-            &debug_store_locations,
-            &shopper_location,
-            &customer_location,
-            "BSL-PSD Shopping Routes (Debug Solver)",
-        )?;
+        // visualize_all_routes(
+        //     debug_output_path,
+        //     &debug_results,
+        //     &debug_store_locations,
+        //     &shopper_location,
+        //     &customer_location,
+        //     "BSL-PSD Shopping Routes (Debug Solver)",
+        // )?;
 
         println!(
             "Debug visualization complete. Output saved to: {}",
@@ -211,167 +220,167 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
 }
 
 /// Generate random store locations for routes
-fn generate_store_locations(routes: &[ShoppingRoute]) -> HashMap<StoreId, (f64, f64)> {
-    let mut store_locations: HashMap<StoreId, (f64, f64)> = HashMap::new();
+// fn generate_store_locations(routes: &[ShoppingRoute]) -> HashMap<StoreId, (f64, f64)> {
+//     let mut store_locations: HashMap<StoreId, (f64, f64)> = HashMap::new();
 
-    // Define the display area bounds with more space between stores
-    let display_min_x = -70.0;
-    let display_max_x = 70.0;
-    let display_min_y = -70.0;
-    let display_max_y = 70.0;
+//     // Define the display area bounds with more space between stores
+//     let display_min_x = -70.0;
+//     let display_max_x = 70.0;
+//     let display_min_y = -70.0;
+//     let display_max_y = 70.0;
 
-    // First, identify all stores used in any route
-    let mut used_store_ids = std::collections::HashSet::new();
-    for route in routes {
-        for store_id in &route.stores {
-            used_store_ids.insert(*store_id);
-        }
-    }
+//     // First, identify all stores used in any route
+//     let mut used_store_ids = std::collections::HashSet::new();
+//     for route in routes {
+//         for store_id in &route.stores {
+//             used_store_ids.insert(*store_id);
+//         }
+//     }
 
-    // Only generate positions for stores that are used in routes
-    for &store_id in &used_store_ids {
-        // Generate random position for each store
-        let x = display_min_x + (display_max_x - display_min_x) * rand::random::<f64>();
-        let y = display_min_y + (display_max_y - display_min_y) * rand::random::<f64>();
-        store_locations.insert(store_id, (x, y));
-    }
+//     // Only generate positions for stores that are used in routes
+//     for &store_id in &used_store_ids {
+//         // Generate random position for each store
+//         let x = display_min_x + (display_max_x - display_min_x) * rand::random::<f64>();
+//         let y = display_min_y + (display_max_y - display_min_y) * rand::random::<f64>();
+//         store_locations.insert(store_id, (x, y));
+//     }
 
-    store_locations
-}
+//     store_locations
+// }
 
 /// Visualize all shopping routes
-fn visualize_all_routes(
-    output_path: &str,
-    routes: &[ShoppingRoute],
-    store_locations: &HashMap<StoreId, (f64, f64)>,
-    shopper_start: &Location,
-    customer_location: &Location,
-    chart_title: &str,
-) -> Result<(), Box<dyn Error>> {
-    // Determine chart boundaries
-    let (min_x, max_x, min_y, max_y) =
-        determine_bounds(store_locations, shopper_start, customer_location);
+// fn visualize_all_routes(
+//     output_path: &str,
+//     routes: &[ShoppingRoute],
+//     store_locations: &HashMap<StoreId, (f64, f64)>,
+//     shopper_start: &Location,
+//     customer_location: &Location,
+//     chart_title: &str,
+// ) -> Result<(), Box<dyn Error>> {
+//     // Determine chart boundaries
+//     let (min_x, max_x, min_y, max_y) =
+//         determine_bounds(store_locations, shopper_start, customer_location);
 
-    // Create chart
-    let root = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
-    root.fill(&WHITE)?;
+//     // Create chart
+//     let root = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
+//     root.fill(&WHITE)?;
 
-    // Set up coordinate system
-    let mut chart = ChartBuilder::on(&root)
-        .caption(
-            format!("{} ({} routes)", chart_title, routes.len()),
-            ("sans-serif", 20).into_font(),
-        )
-        .margin(10)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
-        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
+//     // Set up coordinate system
+//     let mut chart = ChartBuilder::on(&root)
+//         .caption(
+//             format!("{} ({} routes)", chart_title, routes.len()),
+//             ("sans-serif", 20).into_font(),
+//         )
+//         .margin(10)
+//         .x_label_area_size(30)
+//         .y_label_area_size(30)
+//         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
-    chart.configure_mesh().draw()?;
+//     chart.configure_mesh().draw()?;
 
-    // Draw all store locations
-    let mut all_route_stores = Vec::new();
-    for route in routes {
-        for store_id in &route.stores {
-            if !all_route_stores.contains(store_id) {
-                all_route_stores.push(*store_id);
-            }
-        }
-    }
+//     // Draw all store locations
+//     let mut all_route_stores = Vec::new();
+//     for route in routes {
+//         for store_id in &route.stores {
+//             if !all_route_stores.contains(store_id) {
+//                 all_route_stores.push(*store_id);
+//             }
+//         }
+//     }
 
-    for (store_id, (x, y)) in store_locations {
-        // All stores in store_locations are used in routes, so we always use GREEN
-        let style = ShapeStyle::from(&GREEN).filled();
+//     for (store_id, (x, y)) in store_locations {
+//         // All stores in store_locations are used in routes, so we always use GREEN
+//         let style = ShapeStyle::from(&GREEN).filled();
 
-        chart
-            .draw_series(std::iter::once(Circle::new((*x, *y), 8, style)))?
-            .label(format!("Store {}", store_id))
-            .legend(move |(x, y)| Circle::new((x, y), 8, style));
-    }
+//         chart
+//             .draw_series(std::iter::once(Circle::new((*x, *y), 8, style)))?
+//             .label(format!("Store {}", store_id))
+//             .legend(move |(x, y)| Circle::new((x, y), 8, style));
+//     }
 
-    // Draw shopper starting point
-    chart
-        .draw_series(std::iter::once(Circle::new(
-            (shopper_start.x, shopper_start.y),
-            10,
-            ShapeStyle::from(&BLUE).filled(),
-        )))?
-        .label("Shopper Start")
-        .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&BLUE).filled()));
+//     // Draw shopper starting point
+//     chart
+//         .draw_series(std::iter::once(Circle::new(
+//             (shopper_start.x, shopper_start.y),
+//             10,
+//             ShapeStyle::from(&BLUE).filled(),
+//         )))?
+//         .label("Shopper Start")
+//         .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&BLUE).filled()));
 
-    // Draw customer location
-    chart
-        .draw_series(std::iter::once(Circle::new(
-            (customer_location.x, customer_location.y),
-            10,
-            ShapeStyle::from(&RED).filled(),
-        )))?
-        .label("Customer Location")
-        .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&RED).filled()));
+//     // Draw customer location
+//     chart
+//         .draw_series(std::iter::once(Circle::new(
+//             (customer_location.x, customer_location.y),
+//             10,
+//             ShapeStyle::from(&RED).filled(),
+//         )))?
+//         .label("Customer Location")
+//         .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&RED).filled()));
 
-    // Draw all routes with different colors
-    let colors = [
-        &RED,
-        &BLUE,
-        &GREEN,
-        &MAGENTA,
-        &CYAN,
-        &RGBColor(255, 165, 0),  // Orange
-        &RGBColor(128, 0, 128),  // Purple
-        &RGBColor(0, 128, 128),  // Teal
-        &RGBColor(128, 128, 0),  // Olive
-        &RGBColor(70, 130, 180), // Steel blue
-    ];
+//     // Draw all routes with different colors
+//     let colors = [
+//         &RED,
+//         &BLUE,
+//         &GREEN,
+//         &MAGENTA,
+//         &CYAN,
+//         &RGBColor(255, 165, 0),  // Orange
+//         &RGBColor(128, 0, 128),  // Purple
+//         &RGBColor(0, 128, 128),  // Teal
+//         &RGBColor(128, 128, 0),  // Olive
+//         &RGBColor(70, 130, 180), // Steel blue
+//     ];
 
-    for (i, route) in routes.iter().enumerate() {
-        if !route.stores.is_empty() {
-            let mut path_points = Vec::new();
-            path_points.push((shopper_start.x, shopper_start.y));
+//     for (i, route) in routes.iter().enumerate() {
+//         if !route.stores.is_empty() {
+//             let mut path_points = Vec::new();
+//             path_points.push((shopper_start.x, shopper_start.y));
 
-            for store_id in &route.stores {
-                if let Some(&(x, y)) = store_locations.get(store_id) {
-                    path_points.push((x, y));
-                }
-            }
+//             for store_id in &route.stores {
+//                 if let Some(&(x, y)) = store_locations.get(store_id) {
+//                     path_points.push((x, y));
+//                 }
+//             }
 
-            path_points.push((customer_location.x, customer_location.y));
+//             path_points.push((customer_location.x, customer_location.y));
 
-            let color = colors[i % colors.len()];
-            chart
-                .draw_series(LineSeries::new(path_points, color.mix(0.7).stroke_width(2)))?
-                .label(format!(
-                    "Route {} (Time: {:.1} min, Cost: ${:.2})",
-                    i + 1,
-                    route.shopping_time,
-                    route.shopping_cost
-                ))
-                .legend(|(x, y)| {
-                    PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(2))
-                });
-        }
-    }
+//             let color = colors[i % colors.len()];
+//             chart
+//                 .draw_series(LineSeries::new(path_points, color.mix(0.7).stroke_width(2)))?
+//                 .label(format!(
+//                     "Route {} (Time: {:.1} min, Cost: ${:.2})",
+//                     i + 1,
+//                     route.shopping_time,
+//                     route.shopping_cost
+//                 ))
+//                 .legend(|(x, y)| {
+//                     PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(2))
+//                 });
+//         }
+//     }
 
-    // Calculate and draw the time-cost curve
-    if routes.len() >= 2 {
-        let time_cost_path = format!(
-            "time_cost_analysis_{}.png",
-            output_path.strip_suffix(".png").unwrap_or(output_path)
-        );
-        create_time_cost_chart(&time_cost_path, routes, chart_title)?;
-        println!("Time-cost analysis saved to: {}", time_cost_path);
-    }
+//     // Calculate and draw the time-cost curve
+//     if routes.len() >= 2 {
+//         let time_cost_path = format!(
+//             "time_cost_analysis_{}.png",
+//             output_path.strip_suffix(".png").unwrap_or(output_path)
+//         );
+//         create_time_cost_chart(&time_cost_path, routes, chart_title)?;
+//         println!("Time-cost analysis saved to: {}", time_cost_path);
+//     }
 
-    chart
-        .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
-        .position(SeriesLabelPosition::UpperLeft)
-        .draw()?;
+//     chart
+//         .configure_series_labels()
+//         .background_style(&WHITE.mix(0.8))
+//         .border_style(&BLACK)
+//         .position(SeriesLabelPosition::UpperLeft)
+//         .draw()?;
 
-    root.present()?;
+//     root.present()?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 /// Create a time-cost trade-off analysis chart
 fn create_time_cost_chart(

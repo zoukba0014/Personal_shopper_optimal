@@ -12,6 +12,7 @@ use crate::algorithms::PSDSolver;
 use crate::models::{
     Cost, Location, ProductId, RouteCandidate, ShoppingList, ShoppingRoute, Store, StoreId, Time,
 };
+
 // Custom wrapper to make f64 implement Eq
 #[derive(PartialEq, Copy, Clone, Debug)]
 struct F64Wrapper(f64);
@@ -132,9 +133,9 @@ impl BSLPSD {
         shopping_list: &ShoppingList,
         shopper_location: Location,
         customer_location: Location,
-    ) -> Option<ShoppingRoute> {
+        // ) -> Option<ShoppingRoute> {
+    ) -> Option<f64> {
         // First verify if the shopping list can be fulfilled by all stores combined
-        let mut can_be_fulfilled = true;
         let mut total_available: HashMap<ProductId, u32> = HashMap::new();
 
         // Calculate available quantities across all stores
@@ -150,22 +151,18 @@ impl BSLPSD {
 
             // Check if enough quantity is available across all stores
             if available < *qty_needed {
-                can_be_fulfilled = false;
-                break;
+                return None; // Cannot fulfill the shopping list
             }
         }
 
-        if !can_be_fulfilled {
-            return None; // Cannot fulfill the shopping list with all stores combined
-        }
+        // For each product, find the lowest cost stores
+        let mut total_cost = 0.0;
 
-        // For each product, create a priority queue of stores based on cost
-        let mut product_store_options: HashMap<ProductId, Vec<(StoreId, f64, u32)>> =
-            HashMap::new();
-
-        for (product_id, _qty_needed) in &shopping_list.items {
+        for (product_id, qty_needed) in &shopping_list.items {
+            let mut remaining_qty = *qty_needed;
             let mut options = Vec::new();
 
+            // Get all store options for this product
             if let Some(stores) = self.product_to_stores.get(product_id) {
                 for &(store_id, _) in stores {
                     let store = self.stores[&store_id].read().unwrap();
@@ -180,59 +177,22 @@ impl BSLPSD {
 
             // Sort options by cost (lowest first)
             options.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-            product_store_options.insert(*product_id, options);
-        }
 
-        // Allocate products to stores (greedily by cost)
-        let mut allocations = HashMap::new();
-        let mut selected_stores = HashSet::new();
+            // Allocate products to lowest cost stores first
+            for &(_, cost, available_qty) in &options {
+                let purchase_qty = std::cmp::min(available_qty, remaining_qty);
+                if purchase_qty > 0 {
+                    total_cost += cost * purchase_qty as f64;
+                    remaining_qty -= purchase_qty;
+                }
 
-        for (product_id, qty_needed) in &shopping_list.items {
-            let mut remaining_qty = *qty_needed;
-            let mut product_allocations = Vec::new();
-
-            if let Some(options) = product_store_options.get(product_id) {
-                for &(store_id, _cost, available_qty) in options {
-                    if remaining_qty == 0 {
-                        break;
-                    }
-
-                    let purchase_qty = std::cmp::min(available_qty, remaining_qty);
-                    if purchase_qty > 0 {
-                        product_allocations.push((store_id, purchase_qty));
-                        selected_stores.insert(store_id);
-                        remaining_qty -= purchase_qty;
-                    }
+                if remaining_qty == 0 {
+                    break;
                 }
             }
-
-            if remaining_qty > 0 {
-                return None; // Shouldn't happen if we checked availability correctly
-            }
-
-            allocations.insert(*product_id, product_allocations);
         }
 
-        // Convert selected stores to a route
-        // We need to order stores to minimize travel time
-        let route: Vec<StoreId> = selected_stores.into_iter().collect();
-
-        if route.is_empty() {
-            return None;
-        }
-
-        // Calculate shopping time (placeholder locations for now)
-        let shopping_time =
-            self.calculate_shopping_time(&route, shopper_location, customer_location);
-
-        // Calculate shopping cost
-        let shopping_cost = self.calculate_shopping_cost(&route, shopping_list);
-
-        Some(ShoppingRoute {
-            stores: route,
-            shopping_time,
-            shopping_cost,
-        })
+        Some(total_cost)
     }
     /// Find the route with minimum shopping time using Dijkstra algorithm
     /// Allows purchasing products across multiple stores
@@ -985,7 +945,8 @@ impl BSLPSD {
         println!("Starting parallel BSL-PSD algorithm with channels...");
         let start_time_find_best_route = std::time::Instant::now();
         // Step 1: Find route with minimum shopping cost
-        let min_cost_route =
+        // let min_cost_route =
+        let min_cost =
             match self.find_min_cost_route(shopping_list, shopper_location, customer_location) {
                 Some(route) => route,
                 None => {
@@ -993,7 +954,7 @@ impl BSLPSD {
                     return (Vec::new(), Duration::default());
                 }
             };
-        println!("Found_min_cost: {:?}", min_cost_route);
+        println!("Found_min_cost: {:?}", min_cost);
 
         // Find route with minimum time cost
         let min_time_route = match self.find_min_time_route_dijkstra(
@@ -1010,11 +971,12 @@ impl BSLPSD {
         let elapsed_limited = start_time_find_best_route.elapsed();
         println!("Found_min_time: {:?}", min_time_route);
 
-        let sc_upper_bound = min_cost_route.shopping_cost;
-        println!(
-            "Found min cost route with cost: ${:.2}, sc_upper_bound: ${:.2}",
-            min_cost_route.shopping_cost, sc_upper_bound
-        );
+        // let sc_upper_bound = min_cost_route.shopping_cost;
+        let sc_upper_bound = min_cost;
+        // println!(
+        //     "Found min cost route with cost: ${:.2}, sc_upper_bound: ${:.2}",
+        //     min_cost_route.shopping_cost, sc_upper_bound
+        // );
 
         // Create termination signal
         let found_upper_bound = Arc::new(AtomicBool::new(false));
@@ -1270,12 +1232,13 @@ impl BSLPSD {
         };
         println!("min time route: {:?}", min_time_route);
 
-        println!(
-            "Found min cost route: {:?} with cost: {}, sc_upper_bound: {}",
-            min_time_route.stores, min_time_route.shopping_cost, min_cost_route.shopping_cost
-        );
+        // println!(
+        //     "Found min cost route: {:?} with cost: {}, sc_upper_bound: {}",
+        //     min_time_route.stores, min_time_route.shopping_cost, min_cost_route.shopping_cost
+        // );
 
-        let sc_upper_bound = min_cost_route.shopping_cost;
+        // let sc_upper_bound = min_cost_route.shopping_cost;
+        let sc_upper_bound = min_cost_route;
 
         // Step 2: Initialize priority queue and linear skyline
         let mut queue = BinaryHeap::new();
@@ -1360,26 +1323,6 @@ impl BSLPSD {
                 // println!("next route: {:?}", next_route);
                 queue.push(next_route);
             }
-            // let update = self.update_skyline(&mut linear_skyline, route);
-            // // self.update_skyline(&mut linear_skyline, route);
-            // // println!("routes: {}", linear_skyline.len());
-            // if linear_skyline.len() == old_size && !update {
-            //     unchanged_count += 1;
-            //     // println!("Skyline unchanged for {} iterations", unchanged_count);
-
-            //     // If unchanged for multiple iterations, consider exhaustive search complete
-            //     if unchanged_count >= max_unchanged {
-            //         println!(
-            //             "Skyline size remained at {} for {} iterations, breaking",
-            //             linear_skyline.len(),
-            //             max_unchanged
-            //         );
-            //         found_upper_bound.store(true, Relaxed);
-            //         // break;
-            //     }
-            // } else {
-            //     unchanged_count = 0
-            // }
         }
 
         println!("Final skyline size: {}", linear_skyline.len());

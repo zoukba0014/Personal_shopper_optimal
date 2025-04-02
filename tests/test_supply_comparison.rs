@@ -3,8 +3,10 @@ use personal_shopper::algorithms::bsl_psd::BSLPSD;
 use personal_shopper::models::{Location, ShoppingList, ShoppingRoute, StoreId};
 use personal_shopper::utils::init_map::init_map_with_road_network;
 use plotters::prelude::*;
+use rand::Rng;
 use std::collections::HashMap;
 use std::error::Error;
+use std::time::Instant;
 
 #[test]
 fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
@@ -12,6 +14,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
     let city_code = "AMS"; // City code
     let product_counts = [5, 10, 15]; // Test three different product counts
     let threshold = 10000;
+    let total_product_counts = 30;
 
     println!(
         "=== Testing BSL-PSD with Limited vs. Infinite Supply for Different Product Counts ==="
@@ -35,7 +38,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
             product_count
         );
         let (limited_stores, limited_travel_times) =
-            match init_map_with_road_network(city_code, false, product_count) {
+            match init_map_with_road_network(city_code, false, total_product_counts) {
                 Ok(data) => data,
                 Err(e) => {
                     eprintln!("Error loading map data: {}", e);
@@ -51,7 +54,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
             product_count
         );
         let (infinite_stores, infinite_travel_times) =
-            match init_map_with_road_network(city_code, true, product_count) {
+            match init_map_with_road_network(city_code, true, total_product_counts) {
                 Ok(data) => data,
                 Err(e) => {
                     eprintln!("Error loading map data: {}", e);
@@ -93,27 +96,22 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
 
         // Create a demanding shopping list to test supply constraints
         // Make sure we don't exceed the available products
-        let count_to_use = std::cmp::min(5, product_ids.len());
+        let count_to_use = std::cmp::min(product_count as usize, product_ids.len());
 
         println!("\nShopping List (using {} products):", count_to_use);
-        if count_to_use >= 5 {
-            shopping_list.add_item(product_ids[0], 4); // More demanding shopping list
-            shopping_list.add_item(product_ids[1], 6);
-            shopping_list.add_item(product_ids[2], 5);
-            shopping_list.add_item(product_ids[3], 4);
-            shopping_list.add_item(product_ids[4], 7);
-        } else {
-            // If available products are fewer than 5, add based on available count
-            for i in 0..count_to_use {
-                let quantity = 3 + (i % 3); // 3-5 units per product
-                shopping_list.add_item(product_ids[i], quantity as u32);
-            }
-        }
 
-        for (product_id, quantity) in &shopping_list.items {
-            let product_info = available_products.get(product_id);
+        // 添加指定数量的产品到购物清单
+        for i in 0..count_to_use {
+            let mut rng = rand::thread_rng();
+            let quantity = rng.gen_range(2..=5); // 随机生成2-5之间的数量
+            shopping_list.add_item(product_ids[i], quantity);
+
+            let product_info = available_products.get(&product_ids[i]);
             if let Some((name, _)) = product_info {
-                println!("  Product {} ({}): {} units", product_id, name, quantity);
+                println!(
+                    "  Added product {} ({}): {} units",
+                    product_ids[i], name, quantity
+                );
             }
         }
 
@@ -127,15 +125,15 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
         infinite_bsl_psd.precompute_data();
 
         // Define start and end points (same for both tests)
-        let shopper_location = Location::new(0.0, 0.0);
-        let customer_location = Location::new(10.0, 10.0);
+        let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
+        let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
 
         println!(
-            "Shopper starting location ({:.1}, {:.1})",
+            "Shopper starting location ({:.4}, {:.4})",
             shopper_location.x, shopper_location.y
         );
         println!(
-            "Customer delivery location ({:.1}, {:.1})",
+            "Customer delivery location ({:.4}, {:.4})",
             customer_location.x, customer_location.y
         );
 
@@ -159,44 +157,44 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
         );
         println!("------------------------------------------");
 
-        if limited_results.is_empty() {
-            println!(
-                "No feasible routes found with limited supply for {} products!",
-                product_count
-            );
-            println!(
-                "This is expected if the shopping list demands exceed total available inventory."
-            );
-        } else {
-            // Randomize store locations for limited supply
-            let limited_store_locations = generate_store_locations(&limited_results);
+        // if limited_results.is_empty() {
+        //     println!(
+        //         "No feasible routes found with limited supply for {} products!",
+        //         product_count
+        //     );
+        //     println!(
+        //         "This is expected if the shopping list demands exceed total available inventory."
+        //     );
+        // } else {
+        //     // Randomize store locations for limited supply
+        //     let limited_store_locations = generate_store_locations(&limited_results);
 
-            // Print each route's information for limited supply
-            for (i, route) in limited_results.iter().enumerate() {
-                println!("Limited Supply Route {}: {:?}", i + 1, route.stores);
-                println!("  Shopping Time: {:.2} minutes", route.shopping_time);
-                println!("  Shopping Cost: ${:.2}", route.shopping_cost);
-                println!("  Store Count: {}", route.stores.len());
-            }
+        //     // Print each route's information for limited supply
+        //     for (i, route) in limited_results.iter().enumerate() {
+        //         println!("Limited Supply Route {}: {:?}", i + 1, route.stores);
+        //         println!("  Shopping Time: {:.2} minutes", route.shopping_time);
+        //         println!("  Shopping Cost: ${:.2}", route.shopping_cost);
+        //         println!("  Store Count: {}", route.stores.len());
+        //     }
 
-            // Visualize routes for limited supply
-            visualize_all_routes(
-                &limited_output_path,
-                &limited_results,
-                &limited_store_locations,
-                &shopper_location,
-                &customer_location,
-                &format!(
-                    "BSL-PSD Shopping Routes ({} products, Limited Supply)",
-                    product_count
-                ),
-            )?;
+        //     // Visualize routes for limited supply
+        //     visualize_all_routes(
+        //         &limited_output_path,
+        //         &limited_results,
+        //         &limited_store_locations,
+        //         &shopper_location,
+        //         &customer_location,
+        //         &format!(
+        //             "BSL-PSD Shopping Routes ({} products, Limited Supply)",
+        //             product_count
+        //         ),
+        //     )?;
 
-            println!(
-                "Limited supply visualization complete. Output saved to: {}",
-                limited_output_path
-            );
-        }
+        //     println!(
+        //         "Limited supply visualization complete. Output saved to: {}",
+        //         limited_output_path
+        //     );
+        // }
 
         // PART 2: Generate results for infinite supply
         println!(
@@ -218,42 +216,42 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
         );
         println!("------------------------------------------");
 
-        if infinite_results.is_empty() {
-            println!(
-                "No feasible routes found with infinite supply for {} products!",
-                product_count
-            );
-            println!("This is unexpected as infinite supply should always find a solution.");
-        } else {
-            // Randomize store locations for infinite supply
-            let infinite_store_locations = generate_store_locations(&infinite_results);
+        // if infinite_results.is_empty() {
+        //     println!(
+        //         "No feasible routes found with infinite supply for {} products!",
+        //         product_count
+        //     );
+        //     println!("This is unexpected as infinite supply should always find a solution.");
+        // } else {
+        //     // Randomize store locations for infinite supply
+        //     let infinite_store_locations = generate_store_locations(&infinite_results);
 
-            // Print each route's information for infinite supply
-            for (i, route) in infinite_results.iter().enumerate() {
-                println!("Infinite Supply Route {}: {:?}", i + 1, route.stores);
-                println!("  Shopping Time: {:.2} minutes", route.shopping_time);
-                println!("  Shopping Cost: ${:.2}", route.shopping_cost);
-                println!("  Store Count: {}", route.stores.len());
-            }
+        //     // Print each route's information for infinite supply
+        //     for (i, route) in infinite_results.iter().enumerate() {
+        //         println!("Infinite Supply Route {}: {:?}", i + 1, route.stores);
+        //         println!("  Shopping Time: {:.2} minutes", route.shopping_time);
+        //         println!("  Shopping Cost: ${:.2}", route.shopping_cost);
+        //         println!("  Store Count: {}", route.stores.len());
+        //     }
 
-            // Visualize routes for infinite supply
-            visualize_all_routes(
-                &infinite_output_path,
-                &infinite_results,
-                &infinite_store_locations,
-                &shopper_location,
-                &customer_location,
-                &format!(
-                    "BSL-PSD Shopping Routes ({} products, Infinite Supply)",
-                    product_count
-                ),
-            )?;
+        //     // Visualize routes for infinite supply
+        //     visualize_all_routes(
+        //         &infinite_output_path,
+        //         &infinite_results,
+        //         &infinite_store_locations,
+        //         &shopper_location,
+        //         &customer_location,
+        //         &format!(
+        //             "BSL-PSD Shopping Routes ({} products, Infinite Supply)",
+        //             product_count
+        //         ),
+        //     )?;
 
-            println!(
-                "Infinite supply visualization complete. Output saved to: {}",
-                infinite_output_path
-            );
-        }
+        //     println!(
+        //         "Infinite supply visualization complete. Output saved to: {}",
+        //         infinite_output_path
+        //     );
+        // }
 
         // PART 3: Comparison between limited and infinite supply
         if !limited_results.is_empty() && !infinite_results.is_empty() {
@@ -284,7 +282,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
                 infinite_results.len(), infinite_total_time_ms, infinite_best_time_ms, infinite_search_time_ms
             );
 
-            // Compare best route metrics
+            // Fastest route comparison (for limited vs infinite supply)
             let limited_fastest = &limited_results[0];
             let infinite_fastest = &infinite_results[0];
 
@@ -302,27 +300,25 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
                 infinite_fastest.stores.len()
             );
 
-            // Time savings with infinite supply
-            let time_savings = limited_fastest.shopping_time - infinite_fastest.shopping_time;
-            let time_savings_percent = (time_savings / limited_fastest.shopping_time) * 100.0;
-
-            // Cost difference with infinite supply
+            // Calculate time & cost impact
+            let time_diff = limited_fastest.shopping_time - infinite_fastest.shopping_time;
             let cost_diff = infinite_fastest.shopping_cost - limited_fastest.shopping_cost;
-            let cost_diff_percent = (cost_diff / limited_fastest.shopping_cost) * 100.0;
+            let time_diff_percent = 100.0 * time_diff / limited_fastest.shopping_time;
+            let cost_diff_percent = 100.0 * cost_diff / limited_fastest.shopping_cost;
 
             println!(
                 "\nImpact of Infinite Supply for {} products:",
                 product_count
             );
-            if time_savings > 0.0 {
+            if time_diff > 0.0 {
                 println!(
                     "  Time Savings: {:.2} minutes ({:.1}%)",
-                    time_savings, time_savings_percent
+                    time_diff, time_diff_percent
                 );
             } else {
                 println!(
                     "  Time Increase: {:.2} minutes ({:.1}%)",
-                    -time_savings, -time_savings_percent
+                    -time_diff, -time_diff_percent
                 );
             }
 
@@ -336,6 +332,75 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
                     "  Cost Savings: ${:.2} ({:.1}%)",
                     -cost_diff, -cost_diff_percent
                 );
+            }
+
+            // Route Quality Trade-off Analysis
+            println!("\nRoute Quality Trade-off Analysis:");
+
+            // Calculate trade-off for limited supply
+            let mut limited_trade_off: Option<(f64, f64, f64)> = None;
+            if limited_results.len() >= 2 {
+                let limited_fastest = &limited_results.first().unwrap();
+                let limited_cheapest = &limited_results.last().unwrap();
+
+                println!("  LIMITED SUPPLY: Fastest route is {:.1}% faster but {:.1}% more expensive than the cheapest route.",
+                    100.0 * (limited_cheapest.shopping_time - limited_fastest.shopping_time) / limited_cheapest.shopping_time,
+                    100.0 * (limited_fastest.shopping_cost - limited_cheapest.shopping_cost) / limited_cheapest.shopping_cost);
+            }
+
+            // Infinite Supply Trade-off Analysis
+            if infinite_results.len() >= 2 {
+                let infinite_fastest = &infinite_results.first().unwrap();
+                let infinite_cheapest = &infinite_results.last().unwrap();
+
+                println!("  INFINITE SUPPLY: Fastest route is {:.1}% faster but {:.1}% more expensive than the cheapest route.",
+                    100.0 * (infinite_cheapest.shopping_time - infinite_fastest.shopping_time) / infinite_cheapest.shopping_time,
+                    100.0 * (infinite_fastest.shopping_cost - infinite_cheapest.shopping_cost) / infinite_cheapest.shopping_cost);
+            }
+
+            // Compare Trade-off Efficiency between Limited and Infinite Supply
+            if limited_results.len() >= 2 && infinite_results.len() >= 2 {
+                let limited_fastest = &limited_results.first().unwrap();
+                let limited_cheapest = &limited_results.last().unwrap();
+                let infinite_fastest = &infinite_results.first().unwrap();
+                let infinite_cheapest = &infinite_results.last().unwrap();
+
+                // Calculate trade-off ratios (time saved per extra dollar spent)
+                let limited_time_saved =
+                    limited_cheapest.shopping_time - limited_fastest.shopping_time;
+                let limited_extra_cost =
+                    limited_fastest.shopping_cost - limited_cheapest.shopping_cost;
+                let limited_efficiency = if limited_extra_cost > 0.0 {
+                    limited_time_saved / limited_extra_cost
+                } else {
+                    0.0
+                };
+
+                let infinite_time_saved =
+                    infinite_cheapest.shopping_time - infinite_fastest.shopping_time;
+                let infinite_extra_cost =
+                    infinite_fastest.shopping_cost - infinite_cheapest.shopping_cost;
+                let infinite_efficiency = if infinite_extra_cost > 0.0 {
+                    infinite_time_saved / infinite_extra_cost
+                } else {
+                    0.0
+                };
+
+                println!("\n  Trade-off Efficiency (minutes saved per extra dollar spent):");
+                println!("    LIMITED SUPPLY: {:.2} minutes/$", limited_efficiency);
+                println!("    INFINITE SUPPLY: {:.2} minutes/$", infinite_efficiency);
+
+                if infinite_efficiency > limited_efficiency {
+                    println!(
+                        "    Infinite supply offers {:.1}% better time/cost trade-off efficiency.",
+                        100.0 * (infinite_efficiency - limited_efficiency) / limited_efficiency
+                    );
+                } else if limited_efficiency > infinite_efficiency {
+                    println!(
+                        "    Limited supply offers {:.1}% better time/cost trade-off efficiency.",
+                        100.0 * (limited_efficiency - infinite_efficiency) / infinite_efficiency
+                    );
+                }
             }
 
             // Create comparison visualization
@@ -376,167 +441,167 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
 }
 
 /// Generate random store locations for routes
-fn generate_store_locations(routes: &[ShoppingRoute]) -> HashMap<StoreId, (f64, f64)> {
-    let mut store_locations: HashMap<StoreId, (f64, f64)> = HashMap::new();
+// fn generate_store_locations(routes: &[ShoppingRoute]) -> HashMap<StoreId, (f64, f64)> {
+//     let mut store_locations: HashMap<StoreId, (f64, f64)> = HashMap::new();
 
-    // Define the display area bounds with more space between stores
-    let display_min_x = -70.0;
-    let display_max_x = 70.0;
-    let display_min_y = -70.0;
-    let display_max_y = 70.0;
+//     // Define the display area bounds with more space between stores
+//     let display_min_x = -70.0;
+//     let display_max_x = 70.0;
+//     let display_min_y = -70.0;
+//     let display_max_y = 70.0;
 
-    // First, identify all stores used in any route
-    let mut used_store_ids = std::collections::HashSet::new();
-    for route in routes {
-        for store_id in &route.stores {
-            used_store_ids.insert(*store_id);
-        }
-    }
+//     // First, identify all stores used in any route
+//     let mut used_store_ids = std::collections::HashSet::new();
+//     for route in routes {
+//         for store_id in &route.stores {
+//             used_store_ids.insert(*store_id);
+//         }
+//     }
 
-    // Only generate positions for stores that are used in routes
-    for &store_id in &used_store_ids {
-        // Generate random position for each store
-        let x = display_min_x + (display_max_x - display_min_x) * rand::random::<f64>();
-        let y = display_min_y + (display_max_y - display_min_y) * rand::random::<f64>();
-        store_locations.insert(store_id, (x, y));
-    }
+//     // Only generate positions for stores that are used in routes
+//     for &store_id in &used_store_ids {
+//         // Generate random position for each store
+//         let x = display_min_x + (display_max_x - display_min_x) * rand::random::<f64>();
+//         let y = display_min_y + (display_max_y - display_min_y) * rand::random::<f64>();
+//         store_locations.insert(store_id, (x, y));
+//     }
 
-    store_locations
-}
+//     store_locations
+// }
 
 /// Visualize all shopping routes
-fn visualize_all_routes(
-    output_path: &str,
-    routes: &[ShoppingRoute],
-    store_locations: &HashMap<StoreId, (f64, f64)>,
-    shopper_start: &Location,
-    customer_location: &Location,
-    chart_title: &str,
-) -> Result<(), Box<dyn Error>> {
-    // Determine chart boundaries
-    let (min_x, max_x, min_y, max_y) =
-        determine_bounds(store_locations, shopper_start, customer_location);
+// fn visualize_all_routes(
+//     output_path: &str,
+//     routes: &[ShoppingRoute],
+//     store_locations: &HashMap<StoreId, (f64, f64)>,
+//     shopper_start: &Location,
+//     customer_location: &Location,
+//     chart_title: &str,
+// ) -> Result<(), Box<dyn Error>> {
+//     // Determine chart boundaries
+//     let (min_x, max_x, min_y, max_y) =
+//         determine_bounds(store_locations, shopper_start, customer_location);
 
-    // Create chart
-    let root = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
-    root.fill(&WHITE)?;
+//     // Create chart
+//     let root = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
+//     root.fill(&WHITE)?;
 
-    // Set up coordinate system
-    let mut chart = ChartBuilder::on(&root)
-        .caption(
-            format!("{} ({} routes)", chart_title, routes.len()),
-            ("sans-serif", 20).into_font(),
-        )
-        .margin(10)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
-        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
+//     // Set up coordinate system
+//     let mut chart = ChartBuilder::on(&root)
+//         .caption(
+//             format!("{} ({} routes)", chart_title, routes.len()),
+//             ("sans-serif", 20).into_font(),
+//         )
+//         .margin(10)
+//         .x_label_area_size(30)
+//         .y_label_area_size(30)
+//         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
-    chart.configure_mesh().draw()?;
+//     chart.configure_mesh().draw()?;
 
-    // Draw all store locations
-    let mut all_route_stores = Vec::new();
-    for route in routes {
-        for store_id in &route.stores {
-            if !all_route_stores.contains(store_id) {
-                all_route_stores.push(*store_id);
-            }
-        }
-    }
+//     // Draw all store locations
+//     let mut all_route_stores = Vec::new();
+//     for route in routes {
+//         for store_id in &route.stores {
+//             if !all_route_stores.contains(store_id) {
+//                 all_route_stores.push(*store_id);
+//             }
+//         }
+//     }
 
-    for (store_id, (x, y)) in store_locations {
-        // All stores in store_locations are used in routes, so we always use GREEN
-        let style = ShapeStyle::from(&GREEN).filled();
+//     for (store_id, (x, y)) in store_locations {
+//         // All stores in store_locations are used in routes, so we always use GREEN
+//         let style = ShapeStyle::from(&GREEN).filled();
 
-        chart
-            .draw_series(std::iter::once(Circle::new((*x, *y), 8, style)))?
-            .label(format!("Store {}", store_id))
-            .legend(move |(x, y)| Circle::new((x, y), 8, style));
-    }
+//         chart
+//             .draw_series(std::iter::once(Circle::new((*x, *y), 8, style)))?
+//             .label(format!("Store {}", store_id))
+//             .legend(move |(x, y)| Circle::new((x, y), 8, style));
+//     }
 
-    // Draw shopper starting point
-    chart
-        .draw_series(std::iter::once(Circle::new(
-            (shopper_start.x, shopper_start.y),
-            10,
-            ShapeStyle::from(&BLUE).filled(),
-        )))?
-        .label("Shopper Start")
-        .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&BLUE).filled()));
+//     // Draw shopper starting point
+//     chart
+//         .draw_series(std::iter::once(Circle::new(
+//             (shopper_start.x, shopper_start.y),
+//             10,
+//             ShapeStyle::from(&BLUE).filled(),
+//         )))?
+//         .label("Shopper Start")
+//         .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&BLUE).filled()));
 
-    // Draw customer location
-    chart
-        .draw_series(std::iter::once(Circle::new(
-            (customer_location.x, customer_location.y),
-            10,
-            ShapeStyle::from(&RED).filled(),
-        )))?
-        .label("Customer Location")
-        .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&RED).filled()));
+//     // Draw customer location
+//     chart
+//         .draw_series(std::iter::once(Circle::new(
+//             (customer_location.x, customer_location.y),
+//             10,
+//             ShapeStyle::from(&RED).filled(),
+//         )))?
+//         .label("Customer Location")
+//         .legend(|(x, y)| Circle::new((x, y), 10, ShapeStyle::from(&RED).filled()));
 
-    // Draw all routes with different colors
-    let colors = [
-        &RED,
-        &BLUE,
-        &GREEN,
-        &MAGENTA,
-        &CYAN,
-        &RGBColor(255, 165, 0),  // Orange
-        &RGBColor(128, 0, 128),  // Purple
-        &RGBColor(0, 128, 128),  // Teal
-        &RGBColor(128, 128, 0),  // Olive
-        &RGBColor(70, 130, 180), // Steel blue
-    ];
+//     // Draw all routes with different colors
+//     let colors = [
+//         &RED,
+//         &BLUE,
+//         &GREEN,
+//         &MAGENTA,
+//         &CYAN,
+//         &RGBColor(255, 165, 0),  // Orange
+//         &RGBColor(128, 0, 128),  // Purple
+//         &RGBColor(0, 128, 128),  // Teal
+//         &RGBColor(128, 128, 0),  // Olive
+//         &RGBColor(70, 130, 180), // Steel blue
+//     ];
 
-    for (i, route) in routes.iter().enumerate() {
-        if !route.stores.is_empty() {
-            let mut path_points = Vec::new();
-            path_points.push((shopper_start.x, shopper_start.y));
+//     for (i, route) in routes.iter().enumerate() {
+//         if !route.stores.is_empty() {
+//             let mut path_points = Vec::new();
+//             path_points.push((shopper_start.x, shopper_start.y));
 
-            for store_id in &route.stores {
-                if let Some(&(x, y)) = store_locations.get(store_id) {
-                    path_points.push((x, y));
-                }
-            }
+//             for store_id in &route.stores {
+//                 if let Some(&(x, y)) = store_locations.get(store_id) {
+//                     path_points.push((x, y));
+//                 }
+//             }
 
-            path_points.push((customer_location.x, customer_location.y));
+//             path_points.push((customer_location.x, customer_location.y));
 
-            let color = colors[i % colors.len()];
-            chart
-                .draw_series(LineSeries::new(path_points, color.mix(0.7).stroke_width(2)))?
-                .label(format!(
-                    "Route {} (Time: {:.1} min, Cost: ${:.2})",
-                    i + 1,
-                    route.shopping_time,
-                    route.shopping_cost
-                ))
-                .legend(|(x, y)| {
-                    PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(2))
-                });
-        }
-    }
+//             let color = colors[i % colors.len()];
+//             chart
+//                 .draw_series(LineSeries::new(path_points, color.mix(0.7).stroke_width(2)))?
+//                 .label(format!(
+//                     "Route {} (Time: {:.1} min, Cost: ${:.2})",
+//                     i + 1,
+//                     route.shopping_time,
+//                     route.shopping_cost
+//                 ))
+//                 .legend(|(x, y)| {
+//                     PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(2))
+//                 });
+//         }
+//     }
 
-    // Calculate and draw the time-cost curve
-    if routes.len() >= 2 {
-        let time_cost_path = format!(
-            "time_cost_analysis_{}.png",
-            output_path.strip_suffix(".png").unwrap_or(output_path)
-        );
-        create_time_cost_chart(&time_cost_path, routes, chart_title)?;
-        println!("Time-cost analysis saved to: {}", time_cost_path);
-    }
+//     // Calculate and draw the time-cost curve
+//     if routes.len() >= 2 {
+//         let time_cost_path = format!(
+//             "time_cost_analysis_{}.png",
+//             output_path.strip_suffix(".png").unwrap_or(output_path)
+//         );
+//         create_time_cost_chart(&time_cost_path, routes, chart_title)?;
+//         println!("Time-cost analysis saved to: {}", time_cost_path);
+//     }
 
-    chart
-        .configure_series_labels()
-        .background_style(&WHITE.mix(0.8))
-        .border_style(&BLACK)
-        .position(SeriesLabelPosition::UpperLeft)
-        .draw()?;
+//     chart
+//         .configure_series_labels()
+//         .background_style(&WHITE.mix(0.8))
+//         .border_style(&BLACK)
+//         .position(SeriesLabelPosition::UpperLeft)
+//         .draw()?;
 
-    root.present()?;
+//     root.present()?;
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 /// Create a time-cost trade-off analysis chart
 fn create_time_cost_chart(
