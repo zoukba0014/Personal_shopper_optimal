@@ -18,7 +18,7 @@ fn test_product_count_threshold_analysis() -> Result<(), Box<dyn Error>> {
     let time_analysis_output_path = "product_count_time_analysis.png"; // Time analysis output path
 
     // Fixed threshold value
-    let threshold = 20000;
+    let threshold = 50000;
     // let total_product_count = 30u32;
 
     // Different product counts to test
@@ -102,7 +102,7 @@ fn test_product_count_threshold_analysis() -> Result<(), Box<dyn Error>> {
         for i in 0..count as usize {
             if i < product_ids.len() {
                 let mut rng = rand::thread_rng();
-                let quantity = rng.gen_range(2..=5);
+                let quantity = rng.gen_range(5..=10);
                 shopping_list.add_item(product_ids[i], quantity);
                 println!("  Added product {}: {} units", product_ids[i], quantity);
             }

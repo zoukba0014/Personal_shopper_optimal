@@ -147,30 +147,73 @@ fn convert_restaurants_to_stores(
         let mut products = HashMap::new();
         let mut inventory = HashMap::new();
 
-        // Randomly select 3-5 products for each store
-        let num_products = 3 + (i % 3) as usize;
+        // Randomly select products for each store in a more realistic way
+        // Randomly assign based on actual store scale and type
+        // Small stores: 3-8 products
+        // Medium stores: 8-15 products
+        // Large stores: 15-25 products
+        // We calculate a store type based on the store ID
+        let store_type = (store_id % 10) as usize;
+        let num_products = if store_type < 6 {
+            // 60% of stores are small stores (3-8)
+            3 + (store_id as usize % 6)
+        } else if store_type < 9 {
+            // 30% of stores are medium stores (8-15)
+            8 + (store_id as usize % 8)
+        } else {
+            // 10% of stores are large stores (15-25)
+            15 + (store_id as usize % 11)
+        };
+
+        // Ensure product count doesn't exceed total available
+        let final_num_products = std::cmp::min(num_products, total_product_type as usize);
+
         let mut available_product_ids = Vec::new();
 
-        // Use store ID multiplied by different prime numbers to create a more random distribution
-        for offset in 0..total_product_type {
-            let product_id = 1 + ((store_id as u32 * 17 + offset * 19) % total_product_type);
+        // Each store has a certain probability of selling specific types of products
+        // Use a pseudo-random function to generate product preferences for each store
+        let product_preference = |product_id: u32| -> bool {
+            // Generate a deterministic pseudo-random value based on store ID and product ID
+            let seed = ((store_id as u32 * 13 + product_id * 17) % 100) as f64 / 100.0;
 
-            if !available_product_ids.contains(&product_id) {
+            // Adjust product probability based on store type
+            let threshold = match store_type {
+                0..=5 => 0.25, // Small stores tend to only sell popular products
+                6..=8 => 0.35, // Medium stores have more diverse products
+                _ => 0.60,     // Large stores sell almost everything
+            };
+
+            seed < threshold
+        };
+
+        // Iterate through all possible products and select based on preference
+        for product_id in 1..=total_product_type {
+            if product_preference(product_id) && !available_product_ids.contains(&product_id) {
                 available_product_ids.push(product_id);
-                if available_product_ids.len() >= num_products {
+                if available_product_ids.len() >= final_num_products {
                     break;
                 }
             }
         }
 
-        // If there aren't enough products, add some more
-        while available_product_ids.len() < num_products {
-            let product_id = (available_product_ids.len() as u32 % total_product_type) + 1;
-            if !available_product_ids.contains(&product_id) {
-                available_product_ids.push(product_id);
+        // If not enough products were selected based on preference, add some basic products
+        if available_product_ids.len() < 3 {
+            // Ensure each store has at least 3 products
+            for product_id in 1..=total_product_type {
+                if !available_product_ids.contains(&product_id) {
+                    available_product_ids.push(product_id);
+                    if available_product_ids.len() >= 3 {
+                        break;
+                    }
+                }
             }
         }
-        // println!("produc ids: {:?}", available_product_ids.len());
+
+        println!(
+            "Store {} has {} products",
+            store_id,
+            available_product_ids.len()
+        );
 
         // Create products and inventory for the selected product IDs
         for &product_id in &available_product_ids {
@@ -181,12 +224,38 @@ fn convert_restaurants_to_stores(
                 format!("Product{}", product_id)
             };
 
-            let product_cost = 5.0 + ((store_id as u32 + product_id) % total_product_type) as f64; // Cost between 5-15
+            // Product pricing logic - more realistic
+            // Base price between 5-15
+            let base_price = 5.0 + (product_id % 10) as f64;
+
+            // Adjust price based on store type
+            let price_factor = match store_type {
+                0..=2 => 1.2, // Small convenience stores have higher prices
+                3..=5 => 1.0, // Regular small stores have normal prices
+                6..=8 => 0.9, // Medium stores offer some discount
+                _ => 0.8,     // Large stores have lower prices
+            };
+
+            // Add some random variation
+            let price_variation = (((store_id as u32 + product_id) % 20) as f64 - 10.0) / 100.0;
+
+            // Final price
+            let product_cost = (base_price * price_factor * (1.0 + price_variation)).max(3.0);
             products.insert(product_id, Product::new(&product_name, product_cost));
 
+            // Inventory logic - more realistic
             if !infinity {
-                inventory.insert(product_id, 3 + (product_id % total_product_type) as u32);
-            // Inventory between 3-7
+                // Base inventory amount
+                let base_inventory = 3 + (product_id % 5) as u32;
+
+                // Adjust inventory based on store type
+                let inventory_factor = match store_type {
+                    0..=5 => 1, // Small stores have less inventory
+                    6..=8 => 2, // Medium stores have moderate inventory
+                    _ => 3,     // Large stores have abundant inventory
+                };
+
+                inventory.insert(product_id, base_inventory * inventory_factor);
             } else {
                 inventory.insert(product_id, 1000000);
             }

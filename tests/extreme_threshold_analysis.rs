@@ -19,7 +19,7 @@ fn test_extreme_threshold_analysis() -> Result<(), Box<dyn Error>> {
 
     // Define extreme threshold values to test
     // Very low, low, medium, high, very high
-    let thresholds = vec![10, 50, 1000, 20000, 50000];
+    let thresholds = vec![10000, 20000, 30000, 40000, 50000];
 
     println!("Starting extreme threshold performance analysis test");
 
@@ -63,17 +63,23 @@ fn test_extreme_threshold_analysis() -> Result<(), Box<dyn Error>> {
     if product_ids.len() >= 5 {
         let mut rng = rand::thread_rng();
 
-        let quantity1 = rng.gen_range(2..=5);
-        let quantity2 = rng.gen_range(2..=5);
-        let quantity3 = rng.gen_range(2..=5);
-        let quantity4 = rng.gen_range(2..=5);
-        let quantity5 = rng.gen_range(2..=5);
+        let quantity1 = rng.gen_range(5..=10);
+        let quantity2 = rng.gen_range(5..=10);
+        let quantity3 = rng.gen_range(5..=10);
+        let quantity4 = rng.gen_range(5..=10);
+        let quantity5 = rng.gen_range(5..=10);
+        let quantity6 = rng.gen_range(5..=10);
+        let quantity7 = rng.gen_range(5..=10);
+        let quantity8 = rng.gen_range(5..=10);
 
         shopping_list.add_item(product_ids[0], quantity1);
         shopping_list.add_item(product_ids[1], quantity2);
         shopping_list.add_item(product_ids[2], quantity3);
         shopping_list.add_item(product_ids[3], quantity4);
         shopping_list.add_item(product_ids[4], quantity5);
+        shopping_list.add_item(product_ids[5], quantity6);
+        shopping_list.add_item(product_ids[6], quantity7);
+        shopping_list.add_item(product_ids[7], quantity8);
     }
 
     println!("\nShopping List:");
@@ -216,21 +222,21 @@ fn visualize_route_counts(
     )?;
 
     // Draw data labels
-    for &(threshold, routes) in results {
-        // Add threshold value label
-        chart.draw_series(std::iter::once(Text::new(
-            format!("t={}", threshold),
-            (threshold as f64, routes as f64 * 0.9),
-            ("sans-serif", 12).into_font(),
-        )))?;
+    // for &(threshold, routes) in results {
+    //     // Add threshold value label
+    //     chart.draw_series(std::iter::once(Text::new(
+    //         format!("t={}", threshold),
+    //         (threshold as f64, routes as f64 * 0.9),
+    //         ("sans-serif", 12).into_font(),
+    //     )))?;
 
-        // Add route count label
-        chart.draw_series(std::iter::once(Text::new(
-            format!("{} routes", routes),
-            (threshold as f64, routes as f64 + (route_padding * 0.2)),
-            ("sans-serif", 15).into_font(),
-        )))?;
-    }
+    //     // Add route count label
+    //     chart.draw_series(std::iter::once(Text::new(
+    //         format!("{} routes", routes),
+    //         (threshold as f64, routes as f64 + (route_padding * 0.2)),
+    //         ("sans-serif", 15).into_font(),
+    //     )))?;
+    // }
 
     root.present()?;
     Ok(())
@@ -329,13 +335,13 @@ fn visualize_time_analysis(
     )?;
 
     // Add labels for thresholds
-    for &(threshold, _, _, _) in results {
-        chart.draw_series(std::iter::once(Text::new(
-            format!("{}", threshold),
-            (threshold as f64, max_time * 0.05),
-            ("sans-serif", 12).into_font(),
-        )))?;
-    }
+    // for &(threshold, _, _, _) in results {
+    //     chart.draw_series(std::iter::once(Text::new(
+    //         format!("{}", threshold),
+    //         (threshold as f64, max_time * 0.05),
+    //         ("sans-serif", 12).into_font(),
+    //     )))?;
+    // }
 
     // Add legend
     chart

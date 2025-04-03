@@ -62,17 +62,23 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
     if product_ids.len() >= 5 {
         let mut rng = rand::thread_rng();
 
-        let quantity1 = rng.gen_range(2..=5);
-        let quantity2 = rng.gen_range(2..=5);
-        let quantity3 = rng.gen_range(2..=5);
-        let quantity4 = rng.gen_range(2..=5);
-        let quantity5 = rng.gen_range(2..=5);
+        let quantity1 = rng.gen_range(5..=10);
+        let quantity2 = rng.gen_range(5..=10);
+        let quantity3 = rng.gen_range(5..=10);
+        let quantity4 = rng.gen_range(5..=10);
+        let quantity5 = rng.gen_range(5..=10);
+        let quantity6 = rng.gen_range(5..=10);
+        let quantity7 = rng.gen_range(5..=10);
+        let quantity8 = rng.gen_range(5..=10);
 
         shopping_list.add_item(product_ids[0], quantity1);
         shopping_list.add_item(product_ids[1], quantity2);
         shopping_list.add_item(product_ids[2], quantity3);
         shopping_list.add_item(product_ids[3], quantity4);
         shopping_list.add_item(product_ids[4], quantity5);
+        shopping_list.add_item(product_ids[5], quantity6);
+        shopping_list.add_item(product_ids[6], quantity7);
+        shopping_list.add_item(product_ids[7], quantity8);
     }
 
     println!("\nShopping List:");
@@ -88,8 +94,8 @@ fn test_threshold_performance_analysis() -> Result<(), Box<dyn Error>> {
     bsl_psd.precompute_data();
 
     // Define start and end points (shopper and customer locations)
-    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
-    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
+    let shopper_location = Location::new(4.8950, 52.3664); // Amsterdam city center restaurant district
+    let customer_location = Location::new(4.8730, 52.3383); // Amsterdam city center southern residential area
 
     println!(
         "Shopper location: ({:.4}, {:.4})",

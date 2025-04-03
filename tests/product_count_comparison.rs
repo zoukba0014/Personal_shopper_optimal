@@ -16,7 +16,7 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
     let output_path_10 = "product_count_10.png"; // Output path for 10 products
     let output_path_15 = "product_count_15.png"; // Output path for 15 products
     let output_summary = "product_count_summary.png"; // Output path for summary comparison
-    let threshold = 10000;
+    let threshold = 50000;
 
     println!("=== Testing BSL-PSD with Different Product Counts ===");
 
@@ -31,8 +31,8 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
     let total_product_counts = 30u32;
 
     // Define fixed locations for shopper and customer (to ensure consistency)
-    let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
-    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
+    let shopper_location = Location::new(4.8950, 52.3664); // Amsterdam city center restaurant district
+    let customer_location = Location::new(4.8730, 52.3383); // Amsterdam city center southern residential area
 
     // Run tests for each product count
     for &product_count in &product_counts {
@@ -86,7 +86,7 @@ fn test_product_count_comparison() -> Result<(), Box<dyn Error>> {
         for i in 0..count_to_use {
             if i < product_ids.len() {
                 let mut rng = rand::thread_rng();
-                let quantity = rng.gen_range(2..=5);
+                let quantity = rng.gen_range(5..=10);
                 let product_id = product_ids[i];
                 shopping_list.add_item(product_id, quantity);
 

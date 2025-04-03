@@ -13,7 +13,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
     // Configuration parameters
     let city_code = "AMS"; // City code
     let product_counts = [5, 10, 15]; // Test three different product counts
-    let threshold = 10000;
+    let threshold = 50000;
     let total_product_counts = 30;
 
     println!(
@@ -100,10 +100,10 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
 
         println!("\nShopping List (using {} products):", count_to_use);
 
-        // 添加指定数量的产品到购物清单
+        // Add specified number of products to the shopping list
         for i in 0..count_to_use {
             let mut rng = rand::thread_rng();
-            let quantity = rng.gen_range(2..=5); // 随机生成2-5之间的数量
+            let quantity = rng.gen_range(5..=10); // Randomly generate a quantity between 5-10
             shopping_list.add_item(product_ids[i], quantity);
 
             let product_info = available_products.get(&product_ids[i]);
@@ -125,8 +125,8 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
         infinite_bsl_psd.precompute_data();
 
         // Define start and end points (same for both tests)
-        let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
-        let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
+        let shopper_location = Location::new(4.8950, 52.3664); // Amsterdam city center restaurant district
+        let customer_location = Location::new(4.8730, 52.3383); // Amsterdam city center southern residential area
 
         println!(
             "Shopper starting location ({:.4}, {:.4})",
@@ -924,30 +924,6 @@ fn create_performance_comparison_chart(
             }),
     )?;
 
-    // Add best time text labels
-    chart_best_time.draw_series(
-        vec![
-            (
-                0f64,
-                limited_best_time_ms,
-                format!("{} ms", limited_best_time_ms as i32),
-            ),
-            (
-                1f64,
-                infinite_best_time_ms,
-                format!("{} ms", infinite_best_time_ms as i32),
-            ),
-        ]
-        .iter()
-        .map(|&(x, y, ref label)| {
-            Text::new(
-                label.clone(),
-                (x + 0.4, y + 5.0),
-                ("sans-serif", 16).into_font(),
-            )
-        }),
-    )?;
-
     // Add supply type labels
     chart_best_time.draw_series(vec![(0f64, "Limited"), (1f64, "Infinite")].iter().map(
         |&(x, label)| {
@@ -988,30 +964,6 @@ fn create_performance_comparison_chart(
                 let color = if x == 0f64 { RED } else { BLUE };
                 Rectangle::new([(x, 0.0), (x + 0.8, y)], color.mix(0.6).filled())
             }),
-    )?;
-
-    // Add extra time text labels
-    chart_extra_time.draw_series(
-        vec![
-            (
-                0f64,
-                limited_extra_time,
-                format!("{} ms", limited_extra_time as i32),
-            ),
-            (
-                1f64,
-                infinite_extra_time,
-                format!("{} ms", infinite_extra_time as i32),
-            ),
-        ]
-        .iter()
-        .map(|&(x, y, ref label)| {
-            Text::new(
-                label.clone(),
-                (x + 0.4, y + 5.0),
-                ("sans-serif", 16).into_font(),
-            )
-        }),
     )?;
 
     // Add supply type labels
@@ -1062,30 +1014,6 @@ fn create_performance_comparison_chart(
             Rectangle::new(
                 [(x, base_y), (x + 0.8, base_y + height)],
                 MAGENTA.mix(0.7).filled(),
-            )
-        }),
-    )?;
-
-    // Add total time text labels
-    chart_total_time.draw_series(
-        vec![
-            (
-                0f64,
-                limited_total_time_ms,
-                format!("Total: {} ms", limited_total_time_ms as i32),
-            ),
-            (
-                1f64,
-                infinite_total_time_ms,
-                format!("Total: {} ms", infinite_total_time_ms as i32),
-            ),
-        ]
-        .iter()
-        .map(|&(x, y, ref label)| {
-            Text::new(
-                label.clone(),
-                (x + 0.4, y + 5.0),
-                ("sans-serif", 16).into_font(),
             )
         }),
     )?;
@@ -1151,30 +1079,6 @@ fn create_performance_comparison_chart(
                 let color = if x == 0f64 { RED } else { BLUE };
                 Rectangle::new([(x, 0.0), (x + 0.8, y)], color.mix(0.6).filled())
             }),
-    )?;
-
-    // Add labels for the bars
-    chart_count.draw_series(
-        vec![
-            (
-                0f64,
-                limited_count as f64,
-                format!("{} routes", limited_count),
-            ),
-            (
-                1f64,
-                infinite_count as f64,
-                format!("{} routes", infinite_count),
-            ),
-        ]
-        .iter()
-        .map(|&(x, y, ref label)| {
-            Text::new(
-                label.clone(),
-                (x + 0.4, y + 0.5),
-                ("sans-serif", 16).into_font(),
-            )
-        }),
     )?;
 
     // Add supply type labels

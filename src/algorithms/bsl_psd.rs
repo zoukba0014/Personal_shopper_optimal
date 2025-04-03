@@ -202,154 +202,158 @@ impl BSLPSD {
         shopper_location: Location,
         customer_location: Location,
     ) -> Option<ShoppingRoute> {
-        // Create a distance mapping and a precursor node mapping
+        let shopping_items: Vec<(ProductId, u32)> =
+            shopping_list.items.iter().map(|(k, v)| (*k, *v)).collect();
+
+        let mut store_products: HashMap<StoreId, HashMap<ProductId, u32>> = HashMap::new();
+        let mut candidate_stores: HashSet<StoreId> = HashSet::new();
+
+        for &(product_id, _) in &shopping_items {
+            for (store_id, store_rc) in &self.stores {
+                let store = store_rc.read().unwrap();
+                if store.has_product(&product_id) {
+                    let inventory_level = store.get_inventory_level(&product_id);
+                    if inventory_level > 0 {
+                        store_products
+                            .entry(*store_id)
+                            .or_insert_with(HashMap::new)
+                            .insert(product_id, inventory_level);
+                        candidate_stores.insert(*store_id);
+                    }
+                }
+            }
+        }
+
+        if candidate_stores.is_empty() {
+            return None;
+        }
+
+        let mut can_be_fulfilled = true;
+        for &(product_id, qty_needed) in &shopping_items {
+            let mut available = 0;
+            for &store_id in &candidate_stores {
+                if let Some(store_inventory) = store_products.get(&store_id) {
+                    if let Some(&quantity) = store_inventory.get(&product_id) {
+                        available += quantity;
+                    }
+                }
+            }
+
+            if available < qty_needed {
+                can_be_fulfilled = false;
+                break;
+            }
+        }
+
+        if !can_be_fulfilled {
+            return None;
+        }
+
         let mut distances: HashMap<(StoreId, Vec<(ProductId, u32)>), f64> = HashMap::new();
         let mut predecessors: HashMap<
             (StoreId, Vec<(ProductId, u32)>),
             Option<(StoreId, Vec<(ProductId, u32)>)>,
         > = HashMap::new();
 
-        // Create a priority queue
+        #[derive(Eq, PartialEq)]
+        struct QueueState {
+            distance: F64Wrapper,
+            store_id: StoreId,
+            remaining_items: Vec<(ProductId, u32)>,
+        }
+
+        impl Ord for QueueState {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                other.distance.cmp(&self.distance)
+            }
+        }
+
+        impl PartialOrd for QueueState {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
         let mut priority_queue = BinaryHeap::new();
+        let mut visited = HashSet::new();
 
-        // Collect all items from the shopping list
-        let shopping_list_items: Vec<(ProductId, u32)> =
-            shopping_list.items.iter().map(|(k, v)| (*k, *v)).collect();
-
-        // Find all stores that can satisfy at least one item from the shopping list
-        let mut candidate_stores: HashSet<StoreId> = HashSet::new();
-        for &(product_id, _) in &shopping_list_items {
-            for (store_id, store_rc) in &self.stores {
-                let store = store_rc.read().unwrap();
-                if store.has_product(&product_id) {
-                    candidate_stores.insert(*store_id);
-                }
-            }
-        }
-
-        // If no candidate stores found, return None as shopping list cannot be satisfied
-        if candidate_stores.is_empty() {
-            return None;
-        }
-
-        // First, verify if the shopping list can be fulfilled by all stores combined
-        let mut can_be_fulfilled = true;
-        {
-            let mut total_available: HashMap<ProductId, u32> = HashMap::new();
-
-            // Calculate available quantities across all stores
-            for &(product_id, qty_needed) in &shopping_list_items {
-                let mut available = 0;
-                for &store_id in &candidate_stores {
-                    let store = self.stores[&store_id].read().unwrap();
-                    if store.has_product(&product_id) {
-                        available += store.get_inventory_level(&product_id);
-                    }
-                }
-                total_available.insert(product_id, available);
-
-                // Check if enough quantity is available across all stores
-                if available < qty_needed {
-                    can_be_fulfilled = false;
-                    break;
-                }
-            }
-
-            if !can_be_fulfilled {
-                return None; // Cannot fulfill the shopping list with all stores combined
-            }
-        }
-
-        // Start from the shopper's location
-        // Set initial distances for each potential starting store
         for &store_id in &candidate_stores {
             let store = self.stores[&store_id].read().unwrap();
 
-            // Calculate distance from shopper's location to this store
             let distance = shopper_location.distance_to(&store.location);
 
-            // Calculate which products and quantities this store can satisfy
-            let mut remaining_quantities = shopping_list_items.clone();
-            let mut any_product_purchased = false;
+            let mut remaining_items = shopping_items.clone();
+            let mut any_purchase = false;
 
-            // Use indexed iteration to avoid multiple mutable borrows
-            for i in 0..remaining_quantities.len() {
-                let (product_id, qty_needed) = &mut remaining_quantities[i];
-                if store.has_product(product_id) {
-                    let available_qty = store.get_inventory_level(product_id);
-                    let purchase_qty = std::cmp::min(available_qty, *qty_needed);
-
-                    if purchase_qty > 0 {
-                        // Update the remaining quantity needed
-                        *qty_needed -= purchase_qty;
-                        any_product_purchased = true;
+            for i in 0..remaining_items.len() {
+                let (product_id, qty_needed) = &mut remaining_items[i];
+                if *qty_needed > 0 {
+                    if let Some(store_inventory) = store_products.get(&store_id) {
+                        if let Some(&available_qty) = store_inventory.get(product_id) {
+                            let purchase_qty = std::cmp::min(available_qty, *qty_needed);
+                            if purchase_qty > 0 {
+                                *qty_needed -= purchase_qty;
+                                any_purchase = true;
+                            }
+                        }
                     }
                 }
             }
 
-            if any_product_purchased {
-                let sorted_remaining = sort_remaining_items(remaining_quantities.clone());
-                distances.insert((store_id, sorted_remaining.clone()), distance);
-                predecessors.insert((store_id, sorted_remaining.clone()), None);
+            if any_purchase {
+                distances.insert((store_id, remaining_items.clone()), distance);
+                predecessors.insert((store_id, remaining_items.clone()), None);
 
                 priority_queue.push(QueueState {
                     distance: F64Wrapper(distance),
                     store_id,
-                    remaining_items: sorted_remaining,
+                    remaining_items,
                 });
             }
         }
 
-        // Track visited nodes to avoid processing them multiple times
-        let mut visited: HashSet<(StoreId, Vec<(ProductId, u32)>)> = HashSet::new();
-
-        // Variables to keep track of the best route found
         let mut best_time = f64::INFINITY;
         let mut best_state = None;
 
-        // Main Dijkstra algorithm loop
         while let Some(QueueState {
             distance,
             store_id: current_store,
             remaining_items: current_remaining,
         }) = priority_queue.pop()
         {
-            let current_dist = distance.0; // Unwrap the f64 value
+            let current_dist = distance.0;
 
-            // Skip if this node has already been visited
-            if visited.contains(&(current_store, current_remaining.clone())) {
+            let state = (current_store, current_remaining.clone());
+            if visited.contains(&state) {
                 continue;
             }
 
-            // Mark as visited
-            visited.insert((current_store, current_remaining.clone()));
+            visited.insert(state);
 
-            // Check if all products have been purchased (all remaining quantities are 0)
             let all_purchased = current_remaining.iter().all(|(_, qty)| *qty == 0);
 
             if all_purchased {
-                // Calculate the final distance to the customer location
                 let store = self.stores[&current_store].read().unwrap();
                 let final_distance = current_dist + store.location.distance_to(&customer_location);
 
-                // Update the best result if this route is faster
+                // If this route is faster, update the best result
                 if final_distance < best_time {
                     best_time = final_distance;
                     best_state = Some((current_store, current_remaining.clone()));
                 }
 
-                // Continue searching for potentially better routes
                 continue;
             }
 
-            // Try the next store
+            if current_dist >= best_time {
+                continue;
+            }
+
             for &next_store in &candidate_stores {
-                // Skip the current store (we've already purchased what we can there)
                 if next_store == current_store {
                     continue;
                 }
 
-                // Get the travel time from current store to next store
                 let edge_weight = self
                     .travel_times
                     .get(&(current_store, next_store))
@@ -360,61 +364,59 @@ impl BSLPSD {
                     continue;
                 }
 
-                // Calculate which products can be purchased at the next store
-                let next_store_ref = self.stores[&next_store].read().unwrap();
+                let next_dist = current_dist + edge_weight;
+
+                if next_dist >= best_time {
+                    continue;
+                }
+
                 let mut new_remaining = current_remaining.clone();
                 let mut any_new_purchases = false;
 
-                // Use indexed iteration to avoid multiple mutable borrows
+                if !store_products.contains_key(&next_store) {
+                    continue;
+                }
+
                 for i in 0..new_remaining.len() {
                     let (product_id, qty_needed) = &mut new_remaining[i];
-                    if *qty_needed > 0 && next_store_ref.has_product(product_id) {
-                        let available_qty = next_store_ref.get_inventory_level(product_id);
-                        let purchase_qty = std::cmp::min(available_qty, *qty_needed);
-
-                        if purchase_qty > 0 {
-                            // Update the remaining quantity needed
-                            *qty_needed -= purchase_qty;
-                            any_new_purchases = true;
+                    if *qty_needed > 0 {
+                        if let Some(store_inventory) = store_products.get(&next_store) {
+                            if let Some(&available_qty) = store_inventory.get(product_id) {
+                                let purchase_qty = std::cmp::min(available_qty, *qty_needed);
+                                if purchase_qty > 0 {
+                                    *qty_needed -= purchase_qty;
+                                    any_new_purchases = true;
+                                }
+                            }
                         }
                     }
                 }
 
-                // Skip if no new products can be purchased
                 if !any_new_purchases {
                     continue;
                 }
 
-                // Sort the remaining items for consistent state comparison
-                let sorted_new_remaining = sort_remaining_items(new_remaining);
-
-                // Calculate the new distance
-                let next_dist = current_dist + edge_weight;
-
-                // Relaxation operation - update if this path is shorter
-                if !distances.contains_key(&(next_store, sorted_new_remaining.clone()))
-                    || next_dist < distances[&(next_store, sorted_new_remaining.clone())]
-                {
-                    distances.insert((next_store, sorted_new_remaining.clone()), next_dist);
+                let next_state = (next_store, new_remaining.clone());
+                if !distances.contains_key(&next_state) || next_dist < distances[&next_state] {
+                    distances.insert(next_state.clone(), next_dist);
                     predecessors.insert(
-                        (next_store, sorted_new_remaining.clone()),
+                        next_state.clone(),
                         Some((current_store, current_remaining.clone())),
                     );
+
                     priority_queue.push(QueueState {
                         distance: F64Wrapper(next_dist),
                         store_id: next_store,
-                        remaining_items: sorted_new_remaining,
+                        remaining_items: new_remaining,
                     });
                 }
             }
         }
 
-        // If no valid route was found, return None
         if best_state.is_none() {
             return None;
         }
 
-        // Reconstruct the path by backtracking
         let mut current_state = best_state.unwrap();
         let mut path = Vec::new();
 
@@ -426,7 +428,6 @@ impl BSLPSD {
         path.push(current_state.0);
         path.reverse();
 
-        // Calculate the shopping cost for the path - this will optimize purchase decisions
         let shopping_cost = self.calculate_shopping_cost(&path, shopping_list);
 
         Some(ShoppingRoute {
@@ -1164,7 +1165,7 @@ impl BSLPSD {
             // self.update_skyline(&mut linear_skyline, route);
             // println!("routes: {}", linear_skyline.len());
             if linear_skyline.len() == old_size && !update {
-                unchanged_count += 1;
+                // unchanged_count += 1;
                 // println!("Skyline unchanged for {} iterations", unchanged_count);
 
                 // If unchanged for multiple iterations, consider exhaustive search complete
