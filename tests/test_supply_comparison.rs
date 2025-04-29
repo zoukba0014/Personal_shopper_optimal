@@ -103,7 +103,7 @@ fn test_supply_comparison() -> Result<(), Box<dyn Error>> {
         // Add specified number of products to the shopping list
         for i in 0..count_to_use {
             let mut rng = rand::thread_rng();
-            let quantity = rng.gen_range(5..=10); // Randomly generate a quantity between 5-10
+            let quantity = rng.gen_range(5..=20); // Randomly generate a quantity between 5-10
             shopping_list.add_item(product_ids[i], quantity);
 
             let product_info = available_products.get(&product_ids[i]);

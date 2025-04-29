@@ -59,14 +59,16 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
     if product_ids.len() >= 5 {
         let mut rng = rand::thread_rng();
 
-        let quantity1 = rng.gen_range(5..=10);
-        let quantity2 = rng.gen_range(5..=10);
-        let quantity3 = rng.gen_range(5..=10);
-        let quantity4 = rng.gen_range(5..=10);
-        let quantity5 = rng.gen_range(5..=10);
-        let quantity6 = rng.gen_range(5..=10);
-        let quantity7 = rng.gen_range(5..=10);
-        let quantity8 = rng.gen_range(5..=10);
+        let quantity1 = rng.gen_range(5..=20);
+        let quantity2 = rng.gen_range(5..=20);
+        let quantity3 = rng.gen_range(5..=20);
+        let quantity4 = rng.gen_range(5..=20);
+        let quantity5 = rng.gen_range(5..=20);
+        let quantity6 = rng.gen_range(5..=20);
+        let quantity7 = rng.gen_range(5..=20);
+        let quantity8 = rng.gen_range(5..=20);
+        // let quantity9 = rng.gen_range(5..=20);
+        // let quantity10 = rng.gen_range(5..=20);
 
         shopping_list.add_item(product_ids[0], quantity1);
         shopping_list.add_item(product_ids[1], quantity2);
@@ -76,6 +78,8 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
         shopping_list.add_item(product_ids[5], quantity6);
         shopping_list.add_item(product_ids[6], quantity7);
         shopping_list.add_item(product_ids[7], quantity8);
+        // shopping_list.add_item(product_ids[8], quantity9);
+        // shopping_list.add_item(product_ids[9], quantity10);
     }
 
     println!("\nShopping List:");
@@ -92,7 +96,7 @@ fn test_bsl_psd_with_visualization() -> Result<(), Box<dyn Error>> {
 
     // Define start and end points (also make them more spread out)
     let shopper_location = Location::new(4.8950, 52.3664); // 阿姆斯特丹市中心餐厅密集区
-    let customer_location = Location::new(4.8730, 52.3383); // 阿姆斯特丹市中心偏南住宅区
+    let customer_location = Location::new(4.8960, 52.3800); // 阿姆斯特丹市中心偏南住宅区
 
     println!(
         "Shopper starting location ({:.4}, {:.4})",
@@ -376,10 +380,10 @@ fn visualize_all_routes(
             chart
                 .draw_series(LineSeries::new(path_points, color.mix(0.7).stroke_width(2)))?
                 .label(format!(
-                    "Route {} (Time: {:.1} min, Cost: ${:.2})",
+                    "Route {} ",
                     i + 1,
-                    route.shopping_time,
-                    route.shopping_cost
+                    // route.shopping_time,
+                    // route.shopping_cost
                 ))
                 .legend(|(x, y)| {
                     PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(2))
@@ -464,11 +468,11 @@ fn visualize_individual_routes(
         let mut chart = ChartBuilder::on(&root)
             .caption(
                 format!(
-                    "{} - Route {} (Time: {:.1} min, Cost: ${:.2})",
+                    "{} - Route {} ",
                     chart_title,
                     i + 1,
-                    route.shopping_time,
-                    route.shopping_cost
+                    // route.shopping_time,
+                    // route.shopping_cost
                 ),
                 ("sans-serif", 20).into_font(),
             )
@@ -588,10 +592,10 @@ fn visualize_individual_routes(
                 color.mix(0.7).stroke_width(3),
             ))?
             .label(format!(
-                "Route {} (Time: {:.1} min, Cost: ${:.2})",
+                "Route {} ",
                 i + 1,
-                route.shopping_time,
-                route.shopping_cost
+                // route.shopping_time,
+                // route.shopping_cost
             ))
             .legend(|(x, y)| {
                 PathElement::new(vec![(x, y), (x + 20, y)], color.mix(0.7).stroke_width(3))
@@ -618,10 +622,10 @@ fn visualize_individual_routes(
 
         // Add a summary of the route information
         let route_summary = format!(
-            "Route Summary:\n- Stores visited: {}\n- Shopping time: {:.2} min\n- Shopping cost: ${:.2}",
+            "Route Summary:\n- Stores visited: {}\n",
             route.stores.len(),
-            route.shopping_time,
-            route.shopping_cost
+            // route.shopping_time,
+            // route.shopping_cost
         );
 
         // Draw route summary as text
